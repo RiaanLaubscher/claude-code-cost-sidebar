@@ -183,6 +183,22 @@ test('the sidebar draws the session, today, 30 days, projects, top sessions and 
   expect(await coloured(ui, /█/, 'red')).toBe(true)
 })
 
+test('the effort level is drawn beside the model, in its colour', async ($, on) => {
+  stubs(on, [doc({ session: { ...doc().session, model_effort: 'xhigh' } })])
+  await start($)
+  const ui = await $.ui.mount(PANE)
+  expect((await ui.find({ type: 'Text', text: /^Opus 5\.5$/ })).props.color).toBe('cyan')
+  expect((await ui.find({ type: 'Text', text: /^ \(xhigh\)$/ })).props.color).toBe('cyan')
+})
+
+test('no effort recorded, nothing is drawn for it', async ($, on) => {
+  stubs(on, [doc()])
+  await start($)
+  const ui = await $.ui.mount(PANE)
+  expect(JSON.stringify(await ui.drawn())).not.toContain('(xhigh)')
+  expect(await ui.find({ type: 'Text', text: /^ \(.*\)$/ })).toBeUndefined()
+})
+
 test('before the first figures, the sidebar says it is starting', async ($, on) => {
   stubs(on, [null])
   await start($)

@@ -1,5 +1,5 @@
 Set up the Claude Code Cost Sidebar on this Mac from
-https://github.com/andrewbakercloudscale/claude-code-cost-sidebar
+https://github.com/RiaanLaubscher/claude-code-cost-sidebar
 
 1. Read the README's Requirements and Install sections first.
 2. Check that I have Claude Code 2.1.287 or later (claude --version), git, jq, Node.js and Python 3.

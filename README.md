@@ -8,7 +8,7 @@
 > Copy this line (the button at its right) and paste it into a terminal on a Mac:
 >
 > ```bash
-> claude "$(curl -fsSL https://raw.githubusercontent.com/andrewbakercloudscale/claude-code-cost-sidebar/main/SETUP_PROMPT.md)"
+> claude "$(curl -fsSL https://raw.githubusercontent.com/RiaanLaubscher/claude-code-cost-sidebar/main/SETUP_PROMPT.md)"
 > ```
 >
 > Claude Code opens with the setup prompt: it checks what is needed, installs, verifies, and tells you what it changed. No sudo. The prompt it runs is [`SETUP_PROMPT.md`](SETUP_PROMPT.md); already in a session, paste that file's text instead.
@@ -17,7 +17,7 @@
 
 ```bash
 D="$HOME/claude-code-cost-sidebar"
-if [ -d "$D/.git" ]; then git -C "$D" pull --ff-only; else git clone https://github.com/andrewbakercloudscale/claude-code-cost-sidebar.git "$D"; fi \
+if [ -d "$D/.git" ]; then git -C "$D" pull --ff-only; else git clone https://github.com/RiaanLaubscher/claude-code-cost-sidebar.git "$D"; fi \
   && bash "$D/claude-panel-setup.sh"
 ```
 
@@ -26,7 +26,7 @@ Then start a new Claude Code session and the sidebar opens by itself. It needs C
 **Uninstall.** One paste removes everything setup installed, then the folder:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/andrewbakercloudscale/claude-code-cost-sidebar/main/claude-panel-uninstall.sh | bash \
+curl -fsSL https://raw.githubusercontent.com/RiaanLaubscher/claude-code-cost-sidebar/main/claude-panel-uninstall.sh | bash \
   && rm -rf "$HOME/claude-code-cost-sidebar"
 ```
 
@@ -532,7 +532,7 @@ moving between fetches without one.
 The one paste at the [top of this page](#claude-code-cost-sidebar) does it without a checkout. To see what it would change first, without changing anything:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/andrewbakercloudscale/claude-code-cost-sidebar/main/claude-panel-uninstall.sh | bash -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/RiaanLaubscher/claude-code-cost-sidebar/main/claude-panel-uninstall.sh | bash -s -- --dry-run
 ```
 
 From a checkout:

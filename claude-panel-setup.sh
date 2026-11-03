@@ -680,9 +680,9 @@ ctx_tier_color() {
 # dulls the red that does mean something. Spend on an expensive model still
 # shows up in red, on the Session/Today/Burn lines that actually measure it.
 model_tier_color() {
-  case "${1,,}" in
-    *haiku*) printf '%s' "$C_GREEN" ;;
-    *opus*|*fable*|*mythos*) printf '%s' "$C_CYAN" ;;
+  case "$1" in
+    *[Hh][Aa][Ii][Kk][Uu]*) printf '%s' "$C_GREEN" ;;
+    *[Oo][Pp][Uu][Ss]*|*[Ff][Aa][Bb][Ll][Ee]*|*[Mm][Yy][Tt][Hh][Oo][Ss]*) printf '%s' "$C_CYAN" ;;
     *) printf '%s' "$C_YELLOW" ;;
   esac
 }
@@ -1694,14 +1694,15 @@ TODAYTOK_PYEOF
   printf '%s' "$out"
 }
 
-# $1 = transcript path. Prints the cached "sid\tmodel\tlabel\tfolder\tepoch"
-# tsv line, calling the identity-scan python only when path+mtime+size
+# $1 = transcript path. Prints the cached
+# "sid\tmodel\tlabel\tfolder\tepoch\teffort" tsv line, calling the
+# identity-scan python only when path+mtime+size
 # changed since the last call (by any panel).
 session_identity_cached() {
   local path="$1" key cache_file stamp cached
   key=$(printf '%s' "$path" | shasum -a 256 | cut -c1-16)
   cache_file="$CCUSAGE_CACHE_DIR/sessid-$key.tsv"
-  stamp=$(transcript_stamp "$path")
+  stamp="$(transcript_stamp "$path"):e"
   if [ -f "$cache_file" ]; then
     IFS=$'\t' read -r cached _ < "$cache_file"
     if [ "$cached" = "$stamp" ]; then
@@ -1716,6 +1717,7 @@ import datetime, json, os, sys
 path = sys.argv[1]
 sid = os.path.basename(path).removesuffix(".jsonl")
 model = "unknown"
+effort = ""
 folder = ""
 first_ts = None
 try:
@@ -1735,6 +1737,7 @@ try:
                 # error it logged as a reply, not a model that served.
                 if m and m != "<synthetic>":
                     model = m
+                    effort = d.get("effort") or effort
 except OSError:
     pass
 
@@ -1752,7 +1755,7 @@ else:
 epoch = 0
 if first_ts:
     epoch = int(datetime.datetime.fromisoformat(first_ts.replace("Z", "+00:00")).timestamp())
-print(f"{sid}\t{model}\t{label}\t{folder}\t{epoch}")
+print(f"{sid}\t{model}\t{label}\t{folder}\t{epoch}\t{effort}")
 PYEOF
 )
   printf '%s\t%s\n' "$stamp" "$out" > "$cache_file.$$.tmp" && mv "$cache_file.$$.tmp" "$cache_file"
@@ -2463,9 +2466,23 @@ shared_memo() { # $1 = name, $2 = function, $3... = the variables it sets
   fi
   "$2"
   mkdir -p "$CCUSAGE_CACHE_DIR"
-  # declare -g: sourced inside this function, a plain declare makes locals.
-  { printf '# %s\n' "$_sm_day"; declare -p "${@:3}" 2>/dev/null | sed 's/^declare /declare -g /'; } \
+  { printf '# %s\n' "$_sm_day"; shared_memo_dump "${@:3}"; } \
     > "$_sm_f.$$.tmp" && mv -f "$_sm_f.$$.tmp" "$_sm_f"
+}
+
+shared_memo_dump() { # $1... = the variables, printed as assignments to source
+  local _sm_v _sm_e _sm_arrs
+  _sm_arrs=" $(compgen -A arrayvar | tr '\n' ' ') "
+  for _sm_v in "$@"; do
+    case "$_sm_arrs" in
+      *" $_sm_v "*)
+        printf '%s=(' "$_sm_v"
+        eval 'for _sm_e in ${'"$_sm_v"'[@]+"${'"$_sm_v"'[@]}"}; do printf " %q" "$_sm_e"; done'
+        printf ' )\n' ;;
+      *) [ -n "${!_sm_v+x}" ] && printf '%s=%q\n' "$_sm_v" "${!_sm_v}" ;;
+    esac
+  done
+  return 0
 }
 
 top_turns_refresh() {
@@ -3445,10 +3462,11 @@ resolve_session() {
 }
 
 # The identity of the transcript resolve_session settled on: sess_id,
-# model_id, model_label, folder_name, sess_start_epoch and sess_elapsed_h.
+# model_id, model_label, folder_name, sess_start_epoch, model_effort and
+# sess_elapsed_h.
 resolve_identity() {
   if [ -n "$latest" ]; then
-    IFS=$'\t' read -r sess_id model_id model_label folder_name sess_start_epoch < <(session_identity_cached "$latest")
+    IFS=$'\t' read -r sess_id model_id model_label folder_name sess_start_epoch model_effort < <(session_identity_cached "$latest")
     # Floor elapsed time at 3 minutes, a session-so-far rate computed over
     # the first few seconds swings wildly and would flash red/green noise.
     sess_elapsed_h=$(awk -v s="$sess_start_epoch" -v n="$(panel_now)" 'BEGIN{ h=(n-s)/3600; if(h<0.05) h=0.05; print h }')
@@ -3611,8 +3629,8 @@ summary_session() {
     # "Session:" and meaning different things (an identifier, a spend) is
     # worse than either being unlabelled. The leading * says the id is
     # truncated (the last five characters of the UUID), not the whole thing.
-    printf '  🤖 Model: %s%s%s  SID: %s*%s%s\n' \
-      "$mtc" "${model_label:-Unknown}" "$C_RESET" \
+    printf '  🤖 Model: %s%s%s%s  SID: %s*%s%s\n' \
+      "$mtc" "${model_label:-Unknown}" "${model_effort:+ ($model_effort)}" "$C_RESET" \
       "$C_ELECTRIC" "${sess_id: -5}" "$C_RESET"
   else
     printf '  🤖 Model: %sUnknown%s\n' "$C_YELLOW" "$C_RESET"
@@ -3880,6 +3898,7 @@ slow_frame_due() { # $1 = now epoch
   (( $1 - last_slow >= SLOW_REFRESH )) && return 0
   [ "$cols" != "$last_cols" ] && return 0
   [ "${model_label:-}" != "${last_model_label:-}" ] && return 0
+  [ "${model_effort:-}" != "${last_model_effort:-}" ] && return 0
   return 1
 }
 
@@ -4799,7 +4818,7 @@ mod_json_write() { # $1 = session id
   fi
   MJ_SID="$sid" MJ_NOW="$(panel_now)" MJ_SLOW_AT="${last_slow:-0}" \
   MJ_REFRESH="$REFRESH" MJ_SLOW_REFRESH="$SLOW_REFRESH" \
-  MJ_MODEL="${model_label:-}" MJ_MODEL_ID="${model_id:-}" MJ_MODEL_TIER="$model_tier" \
+  MJ_MODEL="${model_label:-}" MJ_MODEL_ID="${model_id:-}" MJ_MODEL_TIER="$model_tier" MJ_MODEL_EFFORT="${model_effort:-}" \
   MJ_FOLDER="${folder_name:-}" MJ_FOLDER_SPEND="${proj_spend:-}" \
   MJ_SESS_COST="$SESS_COST" MJ_SESS_TIER="$sess_tier" MJ_SESS_RATE="$sess_rate_now" MJ_SESS_RATE_TIER="$sess_rate_tier" \
   MJ_SESS_START="${sess_start_epoch:-0}" MJ_AVG_SESSION="${avg_session_cost:-0}" \
@@ -4934,6 +4953,7 @@ doc = {
     "sid": text("MJ_SID"),
     "session": {
         "model": text("MJ_MODEL"), "model_id": text("MJ_MODEL_ID"), "model_tier": text("MJ_MODEL_TIER"),
+        "model_effort": text("MJ_MODEL_EFFORT"),
         "folder": text("MJ_FOLDER"), "folder_spend": num("MJ_FOLDER_SPEND"),
         "cost": num("MJ_SESS_COST"), "tier": text("MJ_SESS_TIER"),
         "rate": num("MJ_SESS_RATE"), "rate_tier": text("MJ_SESS_RATE_TIER"),
@@ -5089,6 +5109,7 @@ headless_main() {
       last_slow=$now_epoch
       last_cols=$cols
       last_model_label="${model_label:-}"
+      last_model_effort="${model_effort:-}"
     fi
     MJ_RECENT_FILE="$tmp_r" MJ_ALL_SESS_FILE="$tmp_a" mod_json_write "$hsid"
     last_write=$now_epoch
@@ -5205,6 +5226,7 @@ while true; do
     last_slow=$now_epoch
     last_cols=$cols
     last_model_label="${model_label:-}"
+    last_model_effort="${model_effort:-}"
   fi
 
   # Everything through the per-turn table is GUARANTEED, printed in full,
