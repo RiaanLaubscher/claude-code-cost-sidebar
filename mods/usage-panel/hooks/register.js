@@ -793,6 +793,7 @@ function sessionSection(Box, T, d, W, burst, warnPct, busy) {
   const n = turns.length > 0 ? turns[turns.length - 1][0] : 0
   out.push(T([
     T(s.model || 'model unknown', { color: TIER[s.model_tier], bold: true }),
+    s.model_effort ? T(' (' + s.model_effort + ')', { color: TIER[s.model_tier] }) : '',
     T('  '),
     T(s.cost == null ? '--' : money(s.cost, 2), { bold: true, color: TIER[s.tier] }),
     T(s.rate == null ? '' : '  ' + money(s.rate, 2) + '/hr', { color: TIER[s.rate_tier] }),

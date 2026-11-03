@@ -79,8 +79,29 @@ if [[ "$(printf '%s\n%s\n' "$MIN_VERSION" "$version" | sort -V | head -1)" != "$
   exit 0
 fi
 
+marketplace_path() {
+  "$CLAUDE" plugin marketplace list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    rows = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for r in rows if isinstance(rows, list) else []:
+    if r.get("name") == "ccusage-panel":
+        print(r.get("path") or r.get("installLocation") or "")
+'
+}
+
+moved=0
+market="$(marketplace_path)"
+if [[ -n "$market" && "${market:A}" != "${ROOT:A}" ]]; then
+  say "the marketplace was $market, moving it to $ROOT"
+  "$CLAUDE" plugin marketplace remove ccusage-panel >/dev/null 2>&1
+  moved=1
+fi
+
 current="$(installed_path)"
-if [[ -n "$current" && "$(mod_hash "$current")" == "$(mod_hash "$SRC")" ]]; then
+if (( ! moved )) && [[ -n "$current" && "$(mod_hash "$current")" == "$(mod_hash "$SRC")" ]]; then
   say "up to date"
   installed
   exit 0
