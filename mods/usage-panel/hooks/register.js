@@ -132,6 +132,13 @@ export function register(on) {
     $.clock.every(LIMITS_MS, async () => { if (await readLimits($)) $.ui.invalidate('ui.render') })
     $.clock.every(EXTRA_MS, async () => { if (await readExtras($)) $.ui.invalidate('ui.render') })
     $.clock.every(READ_MS, async () => {
+      const id = await $.session.id()
+      if (id && id !== sid) {
+        sid = id
+        data = null
+        raw = ''
+        await feed($)
+      }
       const changed = await read($)
       const bg = await readBackground($)
       if ((await readBurst($)) || changed || bg) $.ui.invalidate('ui.render')

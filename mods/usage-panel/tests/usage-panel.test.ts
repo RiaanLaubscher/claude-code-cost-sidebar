@@ -66,6 +66,8 @@ let seated = true
 // Burst's ~/.config/claude-burst/mod.json; null is no file, its defaults.
 let burstMod: object | null = null
 
+let sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeb598c'
+
 // Ghostty Dock's background for this session's terminal; null is no file.
 let dockBg: string | null = null
 
@@ -75,7 +77,7 @@ function stubs(on, files: Array<object | null>, runs: string[][] = [], store: Re
   const clock = mock.clock(on, { now: NOW * 1000 })
   mock.env(on, { HOME: '/Users/me' })
   on('session.start', () => ({ cwd: '/work' }))
-  on('session.id', () => ({ value: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeb598c' }))
+  on('session.id', () => ({ value: sessionId }))
   on('session.cwd', () => ({ value: '/work' }))
   on('command.register', () => ({ value: undefined }))
   on('ui.open', ($, e) => { opened.push(e); return { value: { isPlaced: seated } } })
@@ -87,7 +89,7 @@ function stubs(on, files: Array<object | null>, runs: string[][] = [], store: Re
   on('fs.read', ($, e) => {
     if (e.path === '/Users/me/.config/claude-burst/mod.json' && burstMod) return { value: JSON.stringify(burstMod) }
     if (e.path === '/Users/me/.local/state/ghostty-dock/backgrounds/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeb598c') return dockBg === null ? { deny: 'no such file' } : { value: dockBg }
-    if (!e.path.endsWith('/mod/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeb598c.json')) return { deny: 'no such file' }
+    if (!e.path.endsWith('/mod/' + sessionId + '.json')) return { deny: 'no such file' }
     const f = files[Math.min(i++, files.length - 1)]
     return f === null ? { deny: 'no such file' } : { value: JSON.stringify(f) }
   })
@@ -239,6 +241,22 @@ test('the feed is kept alive every 30 seconds and the file re-read every 5', asy
   await ui.unmount()
   await clock.advance(25000)
   expect(runs.length).toBe(2)
+})
+
+test('after /clear the sidebar follows the new session id', async ($, on) => {
+  const runs: string[][] = []
+  const clock = stubs(on, [doc(), doc({ session: { ...doc().session, cost: 0.42 } })], runs)
+  await start($)
+  sessionId = 'ffffffff-bbbb-cccc-dddd-eeeeeee00001'
+  try {
+    await clock.advance(5000)
+    expect(runs.some((r) => r[1] === sessionId)).toBe(true)
+    const ui = await $.ui.mount(PANE)
+    expect(await ui.find({ type: 'Text', text: /^\$0\.42$/ })).toBeDefined()
+    await ui.unmount()
+  } finally {
+    sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeb598c'
+  }
 })
 
 test('insights say what matters and nothing when there is nothing', () => {
